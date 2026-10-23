@@ -965,6 +965,7 @@ async def build_nuvio_collection_data(token: str, collection_type: str = "full",
             folder_copy["sources"] = sources or f.get("sources")
             folder_copy["catalogSources"] = catalog_sources or f.get("catalogSources")
             cleaned_folders.append(folder_copy)
+    cleaned_folders.sort(key=lambda f: f.get("id") == "68ba6673-3480-4601-980e-4f69862777c3")
     ott_collection["folders"] = cleaned_folders
 
     explore_collection = {
