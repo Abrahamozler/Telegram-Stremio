@@ -12,6 +12,7 @@ from pyrogram.enums import ChatMemberStatus
 from pyrogram.errors import UserNotParticipant
 
 from Backend import __version__, db
+from Backend.helper.database import META_PROJECTION
 from Backend.config import Telegram
 from Backend.helper.analytics import client_ip_from, record_client
 from Backend.fastapi.security.tokens import verify_token
@@ -174,7 +175,7 @@ def _parse_stremio_id(id: str):
 
 
 async def _title_allowed(imdb_id: str = None, token_data: dict = None, kitsu_id: int = None) -> bool:
-    doc = await db.get_media_details(imdb_id=imdb_id, kitsu_id=kitsu_id)
+    doc = await db.get_media_details(imdb_id=imdb_id, kitsu_id=kitsu_id, projection={"visibility": 1, "allowed_tokens": 1})
     if not doc:
         return True
     return _token_can_view(doc.get("visibility") or "public", doc.get("allowed_tokens") or [], token_data)
@@ -600,10 +601,10 @@ async def get_catalog(token: str, media_type: str, id: str, extra: Optional[str]
 
             vis_filter = _merge_filters(_visibility_query(token_data), _not_exclusive_clause())
             if media_type == "movie":
-                data = await db.sort_movies(sort_params, page, PAGE_SIZE, genre_filter=genre_filter, extra_filter=vis_filter)
+                data = await db.sort_movies(sort_params, page, PAGE_SIZE, genre_filter=genre_filter, extra_filter=vis_filter, projection=META_PROJECTION)
                 items = data.get("movies", [])
             else:
-                data = await db.sort_tv_shows(sort_params, page, PAGE_SIZE, genre_filter=genre_filter, extra_filter=vis_filter)
+                data = await db.sort_tv_shows(sort_params, page, PAGE_SIZE, genre_filter=genre_filter, extra_filter=vis_filter, projection=META_PROJECTION)
                 items = data.get("tv_shows", [])
     except Exception:
         return {"metas": []}
@@ -623,7 +624,9 @@ async def get_meta(token: str, media_type: str, id: str, token_data: dict = Depe
     imdb_id = parsed["imdb_id"] if not parsed["is_kitsu"] else None
     kitsu_id = parsed["kitsu_id"]
 
-    media = await db.get_media_details(imdb_id=imdb_id, kitsu_id=kitsu_id)
+    media = await db.get_media_details(
+        imdb_id=imdb_id, kitsu_id=kitsu_id, projection={"telegram": 0, "seasons.episodes.telegram": 0}
+    )
     if not media:
         return {"meta": {}}
 

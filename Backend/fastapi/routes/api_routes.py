@@ -146,6 +146,12 @@ def _resolve_covers(items) -> None:
                 item[key] = resolve_cover_url(item[key])
 
 
+_LIST_PROJECTION = {k: 0 for k in (
+    "description", "cast", "telegram.name", "seasons.episodes.title", "seasons.episodes.overview",
+    "seasons.episodes.episode_backdrop", "seasons.episodes.telegram.name",
+)}
+
+
 #----- Media management
 async def list_media_api(
     media_type: str = Query("movie", regex="^(movie|tv)$"),
@@ -173,9 +179,9 @@ async def list_media_api(
                 key: filtered_results[start_index:start_index + page_size],
             }
         elif media_type == "movie":
-            resp = await db.sort_movies([], page, page_size, extra_filter=extra_filter)
+            resp = await db.sort_movies([], page, page_size, extra_filter=extra_filter, projection=_LIST_PROJECTION)
         else:
-            resp = await db.sort_tv_shows([], page, page_size, extra_filter=extra_filter)
+            resp = await db.sort_tv_shows([], page, page_size, extra_filter=extra_filter, projection=_LIST_PROJECTION)
         _resolve_covers(resp.get(key))
         return resp
     except Exception as e:
@@ -1991,8 +1997,8 @@ def _scan_client():
 async def get_tools_channels_api() -> dict:
     channels = list(SettingsManager.current().auth_channels)
     client = _scan_client()
-    result = []
-    for ch in channels:
+
+    async def _resolve(ch):
         name = str(ch)
         try:
             if client is not None:
@@ -2000,8 +2006,9 @@ async def get_tools_channels_api() -> dict:
                 name = getattr(chat, "title", None) or getattr(chat, "first_name", None) or str(ch)
         except Exception as e:
             LOGGER.warning(f"[Tools] Could not resolve channel {ch}: {e}")
-        result.append({"id": str(ch), "name": name})
-    return {"status": "success", "data": result}
+        return {"id": str(ch), "name": name}
+
+    return {"status": "success", "data": await asyncio.gather(*(_resolve(ch) for ch in channels))}
 
 
 #----- ── Manual upload session (web replacement for the /set bot command) ──
