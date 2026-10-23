@@ -204,7 +204,7 @@ async def _get_db_matches_in_tmdb_order(
 
     for db_key in storage_keys:
         try:
-            cursor = db.dbs[db_key][collection_name].find(query)
+            cursor = db.dbs[db_key][collection_name].find(query, META_PROJECTION)
             async for item in cursor:
                 try:
                     t_id = int(item.get("tmdb_id"))
@@ -218,7 +218,7 @@ async def _get_db_matches_in_tmdb_order(
                     token_data,
                 ):
                     continue
-                by_tmdb_id[t_id] = convert_objectid_to_str(item) if "convert_objectid_to_str" in globals() else item
+                by_tmdb_id[t_id] = convert_objectid_to_str(item)
         except Exception as exc:
             LOGGER.warning(f"[TMDB Trending] DB error querying {db_key}: {exc}")
 
@@ -709,11 +709,11 @@ async def build_nuvio_collection_data(token: str, collection_type: str = "full",
     def get_cat_id(name_query: str, auto_key: str = "", media_type: str = "movie", fallback: Optional[str] = None, strict: bool = True):
         cmap = catalog_movies_map if media_type == "movie" else catalog_series_map
         amap = auto_key_movies_map if media_type == "movie" else auto_key_series_map
+        if auto_key and auto_key.lower() in amap:
+            return amap[auto_key.lower()]
         for name, cid in cmap.items():
             if name_query.lower() in name:
                 return cid
-        if auto_key and auto_key.lower() in amap:
-            return amap[auto_key.lower()]
         return None if strict else fallback
 
     hotstar_movie = get_cat_id("hotstar", "auto_hotstar", "movie", strict=True)
@@ -966,125 +966,6 @@ async def build_nuvio_collection_data(token: str, collection_type: str = "full",
             folder_copy["catalogSources"] = catalog_sources or f.get("catalogSources")
             cleaned_folders.append(folder_copy)
     ott_collection["folders"] = cleaned_folders
-
-    explore_collection = {
-        "id": "966190a9-3785-4ef0-9f1b-883478bf618c-community",
-        "title": "Explore & Discover🗺️",
-        "folders": [
-          {
-            "id": "f2e9b8dc-f50a-4bc7-96d3-30053ce27ad6",
-            "title": "India 🇮🇳",
-            "sources": [
-              {"type": "movie", "addonId": addon_id, "provider": "addon", "catalogId": bollywood_movie},
-              {"type": "series", "addonId": addon_id, "provider": "addon", "catalogId": bollywood_series}
-            ],
-            "hideTitle": False,
-            "tileShape": "landscape",
-            "focusGifUrl": "https://media2.giphy.com/media/v1.Y2lkPTZjMDliOTUycDFtbGliOHdobmttbjRvZzZuODVjMnk4NHk2eHl0cW8zZG43a2M4cSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/zySGXB0I0me7fGQv3Y/giphy.gif",
-            "coverImageUrl": "https://img.ge/i/Z9JCe74.jpg",
-            "catalogSources": [
-              {"type": "movie", "addonId": addon_id, "catalogId": bollywood_movie},
-              {"type": "series", "addonId": addon_id, "catalogId": bollywood_series}
-            ],
-            "focusGifEnabled": True
-          },
-          {
-            "id": "c2206436-c704-4fca-a026-f4d426c40992",
-            "title": "Warner Bros. Pictures",
-            "sources": [
-              {"title": "Warner Bros.", "sortBy": "popularity.desc", "tmdbId": 174, "provider": "tmdb", "mediaType": "MOVIE", "tmdbSourceType": "COMPANY"}
-            ],
-            "hideTitle": False,
-            "tileShape": "landscape",
-            "focusGifUrl": "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExYmpsd2tvcmR1ZzZpZ2cxYWRqcmhycWRqeXBlMWttNGNhZjZkaGp4ZSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/WUaJwN6Rlsf9M47p8e/giphy.gif",
-            "coverImageUrl": "https://files.catbox.moe/ngl1qa.jpg",
-            "catalogSources": [],
-            "focusGifEnabled": True
-          },
-          {
-            "id": "folder-08ic2wbn",
-            "title": "Anime",
-            "sources": [
-              {
-                "id": "src-60QLR3CH",
-                "name": "Trending Anime Series",
-                "genre": "Trending Anime Series",
-                "title": "Trending Anime Series",
-                "sortBy": "popularity.desc",
-                "filters": {
-                  "withGenres": "16",
-                  "voteCountGte": 60,
-                  "withoutKeywords": "198385|378816|155477|256466|329280|570|1817|15078|13059|195669|325693|360629|284535|356759|337946",
-                  "withOriginalLanguage": "ja"
-                },
-                "provider": "tmdb",
-                "mediaType": "TV",
-                "tmdbSourceType": "DISCOVER"
-              },
-              {
-                "id": "src-3OBFNGID",
-                "name": "Top Rated Anime Series",
-                "genre": "Top Rated Anime Series",
-                "title": "Top Rated Anime Series",
-                "sortBy": "vote_average.desc",
-                "filters": {
-                  "withGenres": "16",
-                  "voteCountGte": 400,
-                  "withoutKeywords": "198385|378816|155477|256466|329280|570|1817|15078|13059|195669|325693|360629|284535|356759|337946",
-                  "withOriginalLanguage": "ja"
-                },
-                "provider": "tmdb",
-                "mediaType": "TV",
-                "tmdbSourceType": "DISCOVER"
-              },
-              {
-                "id": "src-28C4UZ10",
-                "name": "Trending Anime Films",
-                "genre": "Trending Anime Films",
-                "title": "Trending Anime Films",
-                "sortBy": "popularity.desc",
-                "filters": {
-                  "withGenres": "16",
-                  "voteCountGte": 120,
-                  "withoutKeywords": "198385|378816|155477|256466|329280|570|1817|15078|13059|195669|325693|360629|284535|356759|337946",
-                  "withOriginalLanguage": "ja"
-                },
-                "provider": "tmdb",
-                "mediaType": "MOVIE",
-                "tmdbSourceType": "DISCOVER"
-              },
-              {
-                "id": "src-BK4KJJNV",
-                "name": "Top Rated Anime Films",
-                "genre": "Top Rated Anime Films",
-                "title": "Top Rated Anime Films",
-                "sortBy": "vote_average.desc",
-                "filters": {
-                  "withGenres": "16",
-                  "voteCountGte": 400,
-                  "withoutKeywords": "198385|378816|155477|256466|329280|570|1817|15078|13059|195669|325693|360629|284535|356759|337946",
-                  "withOriginalLanguage": "ja"
-                },
-                "provider": "tmdb",
-                "mediaType": "MOVIE",
-                "tmdbSourceType": "DISCOVER"
-              }
-            ],
-            "hideTitle": False,
-            "tileShape": "landscape",
-            "focusGifUrl": "https://i.postimg.cc/KYhBq15R/VID-20260417-220322.gif",
-            "titleLogoUrl": "https://raw.githubusercontent.com/ImKaptain/nuvio-art/main/art/anime/discover-anime/discover-anime-logo.png",
-            "coverImageUrl": "https://i.postimg.cc/nLSgj8fw/Anime-Logo-PNG-HD-Image(1).png",
-            "catalogSources": [],
-            "focusGifEnabled": True,
-            "heroBackdropUrl": "https://raw.githubusercontent.com/ImKaptain/nuvio-art/main/art/anime/discover-anime/discover-anime-backdrop.jpg"
-          }
-        ],
-        "pinToTop": True,
-        "viewMode": "TABBED_GRID",
-        "showAllTab": True,
-        "focusGlowEnabled": True
-    }
 
     explore_collection = {
         "id": "966190a9-3785-4ef0-9f1b-883478bf618c-community",
@@ -1369,7 +1250,7 @@ async def build_nuvio_collection_data(token: str, collection_type: str = "full",
                 "filters": {
                   "withGenres": "16",
                   "voteCountGte": 5,
-                  "releaseDateGte": "2025-10-01",
+                  "releaseDateGte": (datetime.utcnow() - timedelta(days=120)).strftime("%Y-%m-%d"),
                   "withoutKeywords": "198385|378816|155477|256466|329280|570|1817|15078|13059|195669|325693|360629|284535|356759|337946",
                   "withOriginalLanguage": "ja"
                 },
@@ -1378,7 +1259,7 @@ async def build_nuvio_collection_data(token: str, collection_type: str = "full",
                 "tmdbSourceType": "DISCOVER"
               },
               {
-                "id": "src-3OBFNGID",
+                "id": "src-MODCLS10",
                 "name": "Modern Classics of the 2010s",
                 "genre": "Modern Classics of the 2010s",
                 "title": "Modern Classics of the 2010s",
@@ -1478,20 +1359,17 @@ async def get_catalog(token: str, media_type: str, id: str, extra: Optional[str]
                 and _token_can_view(*_effective_visibility(catalog, it), token_data)
             ]
             visible_items.sort(key=lambda it: it.get("updated_on") or it.get("added_at") or datetime.min, reverse=True)
-            items = await db.get_documents(visible_items)
-            items = [it for it in items if _token_can_view(it.get("visibility") or "public", it.get("allowed_tokens") or [], token_data)]
-
             if search_query:
-                q = search_query.lower()
-                items = [
-                    it for it in items
-                    if q in (it.get("title") or "").lower()
-                    or q in (it.get("name") or "").lower()
-                    or q in (it.get("original_title") or "").lower()
-                ]
-
-            start = (page - 1) * PAGE_SIZE
-            items = items[start:start + PAGE_SIZE]
+                ids = [int(it["tmdb_id"]) for it in visible_items if it.get("tmdb_id") is not None]
+                found = await db.search_documents(
+                    query=search_query, page=page, page_size=PAGE_SIZE,
+                    extra_filter=_merge_filters({"tmdb_id": {"$in": ids}}, _visibility_query(token_data)),
+                )
+                items = [it for it in found.get("results", []) if it.get("media_type") == db_media_type]
+            else:
+                start = (page - 1) * PAGE_SIZE
+                items = await db.get_documents(visible_items[start:start + PAGE_SIZE])
+                items = [it for it in items if _token_can_view(it.get("visibility") or "public", it.get("allowed_tokens") or [], token_data)]
         elif search_query:
             search_results = await db.search_documents(
                 query=search_query, page=page, page_size=PAGE_SIZE,
@@ -1529,10 +1407,10 @@ async def get_catalog(token: str, media_type: str, id: str, extra: Optional[str]
                 sort_params = [("updated_on", "desc")]
                 vis_filter = _merge_filters(_visibility_query(token_data), _not_exclusive_clause())
                 if media_type == "movie":
-                    data = await db.sort_movies(sort_params, page, PAGE_SIZE, genre_filter=genre_filter, extra_filter=vis_filter)
+                    data = await db.sort_movies(sort_params, page, PAGE_SIZE, genre_filter=genre_filter, extra_filter=vis_filter, projection=META_PROJECTION)
                     items = data.get("movies", [])
                 else:
-                    data = await db.sort_tv_shows(sort_params, page, PAGE_SIZE, genre_filter=genre_filter, extra_filter=vis_filter)
+                    data = await db.sort_tv_shows(sort_params, page, PAGE_SIZE, genre_filter=genre_filter, extra_filter=vis_filter, projection=META_PROJECTION)
                     items = data.get("tv_shows", [])
         else:
             if "latest" in id:

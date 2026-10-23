@@ -145,7 +145,7 @@ The app is great for personal, single-user use, but it's intentionally lighter t
 
 ### 2. Nuvio Collection & Logo Buttons (Optional)
 * **URL:** `https://<YOUR_DOMAIN>/stremio/<TOKEN>/nuvio-collection.json`
-* **File:** The Telegram bot automatically attaches the downloadable `nuvio_collection.json` document on `/start` or subscription approval.
+* The bot sends these collection links (full, OTT-only, explore-only) on `/start` and on subscription approval.
 * Import the URL or JSON file into **Nuvio (Settings ⚙️ → Collections → Import)** to display horizontal **Landscape Logo Buttons** (*Netflix*, *JioHotstar*, *Prime Video*, *Apple TV*, *Bollywood*, *Anime*, *Marvel*, *Star Wars*) on the Nuvio home screen!
 
 > ⚠️ **Important for Server Hosts:**  
