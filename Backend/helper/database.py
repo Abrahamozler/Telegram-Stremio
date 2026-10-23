@@ -137,6 +137,8 @@ class Database:
                 prefix = "telegram" if collection_name == "movie" else "seasons.episodes.telegram"
                 await db[collection_name].create_index([(f"{prefix}.id", ASCENDING)])
                 await db[collection_name].create_index([(f"{prefix}.parts.msg_id", ASCENDING)])
+                for field in ("title", "title_english", "original_title", f"{prefix}.name"):
+                    await db[collection_name].create_index([(field, ASCENDING)])
             except Exception as e:
                 LOGGER.error(f"Failed creating index on {db_key}/{collection_name}: {e}")
 
@@ -1750,7 +1752,8 @@ class Database:
             query: str, 
             page: int, 
             page_size: int,
-            extra_filter: Optional[dict] = None
+            extra_filter: Optional[dict] = None,
+            media_type: Optional[str] = None,
         ) -> dict:
 
             skip = (page - 1) * page_size
@@ -1800,6 +1803,13 @@ class Database:
                 {"$limit": skip + page_size},
             ]
             
+            searches = [(c, m, p) for c, m, p in (("tv", tv_match, tv_pipeline), ("movie", movie_match, movie_pipeline))
+                        if media_type in (None, c)]
+
+            async def _search(db):
+                found = await gather(*(db[c].aggregate(p).to_list(None) for c, _, p in searches))
+                return [doc for docs in found for doc in docs]
+
             results = []
             dbs_checked = []
             
@@ -1807,26 +1817,20 @@ class Database:
             active_db = self.dbs[active_db_key]
             dbs_checked.append(self.current_db_index)
             
-            tv_results = await active_db["tv"].aggregate(tv_pipeline).to_list(None)
-            movie_results = await active_db["movie"].aggregate(movie_pipeline).to_list(None)
-            combined = tv_results + movie_results
-            results.extend(combined)
+            results.extend(await _search(active_db))
             
             if len(results) < page_size:
                 previous_db_index = self.current_db_index - 1
                 while previous_db_index > 0 and len(results) < page_size:
                     prev_db_key = f"storage_{previous_db_index}"
                     prev_db = self.dbs[prev_db_key]
-                    tv_results_prev = await prev_db["tv"].aggregate(tv_pipeline).to_list(None)
-                    movie_results_prev = await prev_db["movie"].aggregate(movie_pipeline).to_list(None)
-                    combined_prev = tv_results_prev + movie_results_prev
-                    results.extend(combined_prev)
+                    results.extend(await _search(prev_db))
                     dbs_checked.append(previous_db_index)
                     previous_db_index -= 1
 
             total_count = sum(await gather(*(
                 self._count(f"storage_{i}", coll, match)
-                for i in dbs_checked for coll, match in (("tv", tv_match), ("movie", movie_match))
+                for i in dbs_checked for coll, match, _ in searches
             )))
             
             paged_results = results[skip:skip + page_size]

@@ -165,18 +165,13 @@ async def list_media_api(
         #----- Custom (manually added) titles carry a negative synthetic tmdb_id
         extra_filter = {"tmdb_id": {"$lt": 0}} if custom else None
         if search:
-            result = await db.search_documents(search, page, page_size)
-            filtered_results = [
-                item for item in result['results']
-                if item.get('media_type') == media_type and (not custom or int(item.get('tmdb_id') or 0) < 0)
-            ]
-            total_filtered = len(filtered_results)
-            start_index = (page - 1) * page_size
+            result = await db.search_documents(search, page, page_size, extra_filter=extra_filter, media_type=media_type)
+            total = result["total_count"]
             resp = {
-                "total_count": total_filtered,
+                "total_count": total,
                 "current_page": page,
-                "total_pages": (total_filtered + page_size - 1) // page_size,
-                key: filtered_results[start_index:start_index + page_size],
+                "total_pages": (total + page_size - 1) // page_size,
+                key: result["results"],
             }
         elif media_type == "movie":
             resp = await db.sort_movies([], page, page_size, extra_filter=extra_filter, projection=_LIST_PROJECTION)
@@ -1553,8 +1548,8 @@ async def search_catalog_media_api(
         return {"results": [], "total_count": 0}
 
     try:
-        result = await db.search_documents(query, page, page_size)
         normalized_type = _normalize_media_type(media_type)
+        result = await db.search_documents(query, page, page_size, media_type=normalized_type)
         filtered = [item for item in result.get("results", []) if item.get("media_type") == normalized_type]
         return {"results": filtered, "total_count": len(filtered)}
     except Exception as e:

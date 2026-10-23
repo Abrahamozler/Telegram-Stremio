@@ -1365,6 +1365,7 @@ async def get_catalog(token: str, media_type: str, id: str, extra: Optional[str]
                 found = await db.search_documents(
                     query=search_query, page=page, page_size=PAGE_SIZE,
                     extra_filter=_merge_filters({"tmdb_id": {"$in": ids}}, _visibility_query(token_data)),
+                    media_type=db_media_type,
                 )
                 items = [it for it in found.get("results", []) if it.get("media_type") == db_media_type]
             else:
@@ -1375,6 +1376,7 @@ async def get_catalog(token: str, media_type: str, id: str, extra: Optional[str]
             search_results = await db.search_documents(
                 query=search_query, page=page, page_size=PAGE_SIZE,
                 extra_filter=_merge_filters(_visibility_query(token_data), _not_exclusive_clause(allow_searchable=True)),
+                media_type="tv" if media_type == "series" else "movie",
             )
             all_items = search_results.get("results", [])
             db_media_type = "tv" if media_type == "series" else "movie"
