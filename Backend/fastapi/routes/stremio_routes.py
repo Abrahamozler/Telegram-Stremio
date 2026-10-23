@@ -771,6 +771,12 @@ async def _kitsu_title_year(kitsu_id: int) -> tuple:
         return "", None
 
 
+#----- Autoplay-next keeps the same quality and route (Cloudflare/Proxy/Direct)
+def _binge_group(quality: str, suffix: str = "") -> str:
+    route = suffix.strip("() ").lower()
+    return f"telegram-stremio-{quality}" + (f"-{route}" if route else "")
+
+
 def _streams_from_global_results(token: str, global_results: list) -> list:
     streams = []
     for r in global_results:
@@ -792,8 +798,10 @@ def _streams_from_global_results(token: str, global_results: list) -> list:
             if SettingsManager.current().cf_stream_mode == "cloudflare":
                 url = cf_url
             else:
-                streams.append({"name": f"{stream_name} (Cloudflare)", "title": stream_title, "url": cf_url, "size_bytes": size_bytes, "sort_name": sort_name})
-        streams.append({"name": stream_name, "title": stream_title, "url": url, "size_bytes": size_bytes, "sort_name": sort_name})
+                streams.append({"name": f"{stream_name} (Cloudflare)", "title": stream_title, "url": cf_url, "size_bytes": size_bytes, "sort_name": sort_name,
+                                "behaviorHints": {"bingeGroup": _binge_group(f"global-{r['quality']}", "(Cloudflare)")}})
+        streams.append({"name": stream_name, "title": stream_title, "url": url, "size_bytes": size_bytes, "sort_name": sort_name,
+                        "behaviorHints": {"bingeGroup": _binge_group(f"global-{r['quality']}")}})
     return streams
 
 
@@ -1082,7 +1090,8 @@ async def get_streams(
                         if label.lower() not in name.lower():
                             name = f"{name} {label}"
                     streams.append({"name": f"{name} {suffix}".strip(), "title": title, "url": url, "size_bytes": size_bytes,
-                                    "episode_start": episode_start, "name_key": name_key, "sort_name": sort_name})
+                                    "episode_start": episode_start, "name_key": name_key, "sort_name": sort_name,
+                                    "behaviorHints": {"bingeGroup": _binge_group(quality_str, suffix)}})
 
                 if cf_url:
                     add("" if cf_only else "(Cloudflare)", cf_url)
