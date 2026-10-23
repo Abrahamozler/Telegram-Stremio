@@ -1148,7 +1148,7 @@ class Database:
 
     async def get_media_ids_by_part(
         self, channel: int, msg_id: int
-    ) -> Optional[Tuple[Optional[str], Optional[int]]]:
+    ) -> Optional[Tuple[Optional[str], Optional[int], str]]:
         try:
             legacy_hash = await encode_string({"chat_id": channel, "msg_id": msg_id})
         except Exception:
@@ -1167,12 +1167,43 @@ class Database:
                 tv_or.append({"seasons.episodes.telegram.id": legacy_hash})
 
             doc = await db["movie"].find_one({"$or": movie_or}, projection)
-            if not doc:
-                doc = await db["tv"].find_one({"$or": tv_or}, projection)
             if doc:
-                return doc.get("imdb_id"), doc.get("tmdb_id")
+                return doc.get("imdb_id"), doc.get("tmdb_id"), "movie"
+            doc = await db["tv"].find_one({"$or": tv_or}, projection)
+            if doc:
+                return doc.get("imdb_id"), doc.get("tmdb_id"), "tv"
 
         return None
+
+    #----- Edited caption: the stored file name follows it (a split file takes part 1's caption)
+    async def rename_media_part(self, channel: int, msg_id: int, name: str) -> bool:
+        legacy_hash = await encode_string({"chat_id": channel, "msg_id": msg_id})
+        part_match = {"$elemMatch": {"chat_id": channel, "msg_id": msg_id}}
+
+        def is_target(q: dict) -> bool:
+            first = (q.get("parts") or [{}])[0]
+            return q.get("id") == legacy_hash or (first.get("chat_id") == channel and first.get("msg_id") == msg_id)
+
+        for i in range(1, self.current_db_index + 1):
+            db = self.dbs[f"storage_{i}"]
+            for coll, path in (("movie", "telegram"), ("tv", "seasons.episodes.telegram")):
+                doc = await db[coll].find_one({"$or": [{f"{path}.id": legacy_hash}, {f"{path}.parts": part_match}]})
+                if not doc:
+                    continue
+                qualities = (doc.get("telegram") or []) if coll == "movie" else [
+                    q for s in doc.get("seasons") or [] for e in s.get("episodes") or [] for q in e.get("telegram") or []
+                ]
+                changed = False
+                for q in qualities:
+                    if is_target(q) and q.get("name") != name:
+                        q["name"] = name
+                        q.pop("ptn", None)
+                        changed = True
+                if changed:
+                    doc["updated_on"] = datetime.utcnow()
+                    await db[coll].replace_one({"_id": doc["_id"]}, doc)
+                return changed
+        return False
 
     async def remove_media_part(self, channel: int, msg_id: int) -> bool:
         try:
@@ -1443,7 +1474,8 @@ class Database:
                 ]
             return await self._merge_split_part(existing_qualities, quality_to_update)
 
-        #----- Incoming is a normal (non-split) file.
+        #----- Incoming is a normal (non-split) file; a re-save of the same message is never its own duplicate.
+        existing_qualities = [q for q in existing_qualities if q.get("id") != quality_to_update.get("id")]
         if replace_mode:
             stale = [q for q in existing_qualities if q.get("quality") == target_quality]
             for q in stale:

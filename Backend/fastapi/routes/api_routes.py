@@ -30,7 +30,7 @@ from Backend.helper.backup import export_config, import_config
 from Backend.helper.custom_dl import ByteStreamer, _speed_test_single_client, run_speed_test
 from Backend.helper.encrypt import decode_string, encode_string
 from Backend.helper.health import run_health_checks
-from Backend.helper.manual_add import resolve_telegram_message, stamp_caption_by_ref
+from Backend.helper.manual_add import resolve_telegram_message, retag_media, stamp_caption_by_ref
 from Backend.helper.pyro import resolve_video_thumb_url
 from Backend.helper.requests_manager import (
     delete_request,
@@ -41,6 +41,7 @@ from Backend.helper.requests_manager import (
     submit_request,
 )
 from Backend.helper.metadata import (
+    build_id_link,
     extract_default_id,
     fetch_selected_movie_metadata,
     fetch_selected_tv_metadata,
@@ -987,6 +988,16 @@ async def search_media_rescan_api(media_type: str, query: str, year: int | None 
     return {"results": results}
 
 
+async def tag_media_api(tmdb_id: str | int, db_index: int, media_type: str):
+    doc = await db.get_document(media_type, _require_tmdb_id(tmdb_id), db_index)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Media not found.")
+    if not build_id_link(doc.get("imdb_id"), doc.get("tmdb_id"), media_type):
+        raise HTTPException(status_code=400, detail="This title has no IMDb or TMDB id to tag with.")
+    asyncio.create_task(retag_media(_scan_client(), media_type, doc))
+    return {"status": "success", "message": "Tagging files in the background."}
+
+
 async def apply_media_rescan_api(request: Request, tmdb_id: str | int, db_index: int, media_type: str):
     tmdb_id = _require_tmdb_id(tmdb_id)
     body = await request.json()
@@ -1018,6 +1029,7 @@ async def apply_media_rescan_api(request: Request, tmdb_id: str | int, db_index:
 
     if not updated_doc:
         raise HTTPException(status_code=500, detail="Failed to replace media metadata.")
+    asyncio.create_task(retag_media(_scan_client(), media_type, updated_doc))
 
     return {
         "success": True,
